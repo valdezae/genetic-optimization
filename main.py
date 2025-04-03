@@ -4,6 +4,7 @@ from scipy.spatial import distance
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
+
 def riesz_s_energy(a_prime, s):
     result = 0
     for i in range(len(a_prime)):
@@ -32,7 +33,7 @@ def fitness_function(population_points):
     return min_distance
 
 
-def create_initial_population(population_size, path):
+def create_initial_population(population_size, individual_size, path):
     points = []
 
     with open(path, 'r') as file:
@@ -59,10 +60,10 @@ def create_initial_population(population_size, path):
 
     for _ in range(population_size):
         random.shuffle(points)  # Shuffle to increase variation
-        individual = points[:instance_size]  # Take first `instance_size` elements
+        individual = random.sample(points, individual_size)  # Take first `individual_size` elements
         population.append(individual.copy())  # Store a copy to prevent modifications
 
-    return population, points
+    return population, points, dimensions
 
 
 def selection(population, fitnesses, tournament_size):
@@ -95,6 +96,7 @@ def crossover(parent1, parent2):
 
     return child1, child2
 
+
 def mutation(individual, mutation_rate, all_points):
     mutated_individual = individual.copy()
     for i in range(len(mutated_individual)):
@@ -126,30 +128,36 @@ def plot_individual(ax, individual, title, dimensions):
     ax.set_title(title)
     return ax
 
-def genetic_algorithm(population_size, generations, mutation_rate):
-    population, points = create_initial_population(population_size, "Instancias/ZCAT1_200_02D.pof")
+
+def genetic_algorithm(population_size, individual_size, generations, mutation_rate):
+    population, points, dimensions = create_initial_population(population_size, individual_size, "Instancias/ZCAT1_1000_03D.pof")
     #print(population)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    if dimensions == 2:
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:  # 3D
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
 
     best_performers = []
 
     all_populations = []
-
 
     table = PrettyTable()
     table.field_names = ["Generation", "Fitness"]
 
     overall_best_individual = None
     overall_best_fitness = float('inf')
-
+    previous_generation_best_fitness = None
+    fitness_repetion = 0
     for generation in range(generations):
-        fitnesses = [riesz_s_energy(ind, 3) for ind in population]
+        fitnesses = [riesz_s_energy(ind, dimensions + 1) for ind in population]
         print(fitnesses)
 
         best_idx = fitnesses.index(min(fitnesses))
         best_individual = population[best_idx].copy()
         best_fitness = fitnesses[best_idx]
+
         print(best_fitness)
 
         if best_fitness < overall_best_fitness:
@@ -159,6 +167,16 @@ def genetic_algorithm(population_size, generations, mutation_rate):
         best_performers.append((best_individual, best_fitness))
         all_populations.append(population[:])
         table.add_row([generation + 1, best_fitness])
+
+        if previous_generation_best_fitness is not None and previous_generation_best_fitness == best_fitness:
+            fitness_repetion += 1
+            if fitness_repetion == 2:
+                break
+        else:
+            # Reset counter if fitness changed
+            fitness_repetion = 0
+
+        previous_generation_best_fitness = best_fitness
 
         population = selection(population, fitnesses, 10)
         #print(population)
@@ -173,28 +191,28 @@ def genetic_algorithm(population_size, generations, mutation_rate):
             next_population.append(mutation(child1, mutation_rate, points))
             next_population.append(mutation(child2, mutation_rate, points))
 
-        if random.random() < 0.5:  # 50% chance of keeping or mutating
-            next_population[0] = mutation(best_individual, mutation_rate, points)
-        else:
-            next_population[0] = best_individual
+        next_population[0] = best_individual
         population = next_population
 
     print(table)
 
     # Plot the best overall individual
     title = f"Best Individual (Fitness: {overall_best_fitness:.4f})"
-    plot_individual(ax, overall_best_individual, title, 2)
+    plot_individual(ax, overall_best_individual, title, dimensions)
 
     plt.tight_layout()
     plt.savefig('best_individual.png')
     plt.show()
 
-def main():
-    population_size = 50
-    generations = 20
-    mutation_rate = 0.2
 
-    genetic_algorithm(population_size, generations, mutation_rate)
+def main():
+    population_size = 150
+    individual_size = 100
+    generations = 20
+    mutation_rate = 0.1
+
+    genetic_algorithm(population_size, individual_size, generations, mutation_rate)
+
 
 if __name__ == "__main__":
     main()
